@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-TW" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>紙幣學習閃卡遊戲</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      box-sizing: border-box;
+    }
+    
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+    
+    * {
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    
+    .flip-card {
+      perspective: 1000px;
+      cursor: pointer;
+    }
+    
+    .flip-card-inner {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+    }
+    
+    .flip-card.flipped .flip-card-inner {
+      transform: rotateY(180deg);
+    }
+    
+    .flip-card-front, .flip-card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 16px;
+      padding: 24px;
+    }
+    
+    .flip-card-back {
+      transform: rotateY(180deg);
+    }
+    
+    .currency-img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+    }
+    
+    .progress-bar-fill {
+      transition: width 0.3s ease;
+    }
+    
+    .shake {
+      animation: shake 0.5s;
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+    
+    .score-pop {
+      animation: scorePop 0.5s ease;
+    }
+    
+    @keyframes scorePop {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+  </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full">
+  <div id="app" class="w-full h-full"></div>
+  <script>
+    const defaultConfig = {
+      background_color: "#0f172a",
+      card_color: "#1e293b",
+      accent_color: "#3b82f6",
+      text_color: "#f8fafc",
+      success_color: "#10b981",
+      game_title: "紙幣學習閃卡遊戲",
+      instructions_text: "看圖片猜國家,翻卡查看答案!",
+      flip_button_text: "翻轉查看答案",
+      next_button_text: "下一題",
+      restart_button_text: "重新開始",
+      font_family: "Noto Sans TC",
+      font_size: 16
+    };
+
+    const currencies = [
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcScH82Yo0P2n5llBPbZVL1sKhV4c6HuwYRbHQ&s", country: "美國" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJQ-AecaQtO2Mos1aSPw_sxsl8AmW1-xuzAQ&s", country: "英國" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTEJaRt7YoZCNifW_eLceFc6nC9AtZQ-eJKpQ&s", country: "日本" },
+      { url: "https://imagedelivery.net/UYQOTZcPn8gGeaNtnHVGeg/91e993d5-81b0-4f10-6142-f7292acd5600/w=768,quality=90,metadata=keep", country: "德國" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTvhJj8V_iVCWTnx-STxio79eH_pLwKt3SluQ&s", country: "加拿大" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQPP_pRgigXtGuwKS2Bly-PkesATZMl7Xz0YA&s", country: "法國" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT1td5uSQwuevpJJ4Xfo8tv45JNCcyLHy4A5Q&s", country: "印度" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSIcN3SjK52JrOSUSef7PNGmg74D1VoXk_kMQ&s", country: "澳洲" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRJxU0qK_DUvzlE-eAGYGoAYJkj8BznK7Mi2Q&s", country: "新加坡" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRihi-xLWcbHxb6qb9LlmsokqfwZ0KB3XqlVw&s", country: "菲律賓" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTfxwk6QMUgIp6FxO0Aqlpxh2cIEIPhgsS0dg&s", country: "韓國" },
+      { url: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRh5jrnKGJCThfY9S6x80D4k6KBgDGSNuHTwA&s", country: "印尼" }
+    ];
+
+    let gameState = {
+      questions: [],
+      currentIndex: 0,
+      score: 0,
+      isFlipped: false,
+      answered: false,
+      gameComplete: false
+    };
+
+    function shuffleArray(array) {
+      const newArray = [...array];
+      for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+      }
+      return newArray;
+    }
+
+    function initGame() {
+      gameState.questions = shuffleArray(currencies).slice(0, 5);
+      gameState.currentIndex = 0;
+      gameState.score = 0;
+      gameState.isFlipped = false;
+      gameState.answered = false;
+      gameState.gameComplete = false;
+      render();
+    }
+
+    function flipCard() {
+      if (gameState.answered || gameState.gameComplete) return;
+      
+      gameState.isFlipped = !gameState.isFlipped;
+      const card = document.getElementById('flip-card');
+      if (gameState.isFlipped) {
+        card.classList.add('flipped');
+      } else {
+        card.classList.remove('flipped');
+      }
+    }
+
+    function handleAnswer(isCorrect) {
+      if (gameState.answered || !gameState.isFlipped) return;
+      
+      gameState.answered = true;
+      
+      if (isCorrect) {
+        gameState.score += 20;
+        const scoreEl = document.getElementById('score');
+        scoreEl.classList.add('score-pop');
+        setTimeout(() => scoreEl.classList.remove('score-pop'), 500);
+      } else {
+        const card = document.getElementById('flip-card');
+        card.classList.add('shake');
+        setTimeout(() => card.classList.remove('shake'), 500);
+      }
+      
+      render();
+    }
+
+    function nextQuestion() {
+      if (gameState.currentIndex < gameState.questions.length - 1) {
+        gameState.currentIndex++;
+        gameState.isFlipped = false;
+        gameState.answered = false;
+        
+        const card = document.getElementById('flip-card');
+        card.classList.remove('flipped');
+        
+        render();
+      } else {
+        gameState.gameComplete = true;
+        render();
+      }
+    }
+
+    function render() {
+      const config = window.elementSdk?.config || defaultConfig;
+      const app = document.getElementById('app');
+      
+      const customFont = config.font_family || defaultConfig.font_family;
+      const baseFontStack = 'Noto Sans TC, sans-serif';
+      const fontFamily = `${customFont}, ${baseFontStack}`;
+      const baseSize = config.font_size || defaultConfig.font_size;
+      
+      const backgroundColor = config.background_color || defaultConfig.background_color;
+      const cardColor = config.card_color || defaultConfig.card_color;
+      const accentColor = config.accent_color || defaultConfig.accent_color;
+      const textColor = config.text_color || defaultConfig.text_color;
+      const successColor = config.success_color || defaultConfig.success_color;
+      
+      if (!gameState.gameComplete) {
+        const current = gameState.questions[gameState.currentIndex];
+        const progress = ((gameState.currentIndex + 1) / gameState.questions.length) * 100;
+        
+        app.innerHTML = `
+          <div class="w-full h-full flex flex-col" style="background: ${backgroundColor}; font-family: ${fontFamily}; color: ${textColor};">
+            <div class="w-full max-w-4xl mx-auto p-6 flex-1 flex flex-col">
+              <div class="text-center mb-6">
+                <h1 class="mb-2" style="font-size: ${baseSize * 2}px; font-weight: 700;">${config.game_title || defaultConfig.game_title}</h1>
+                <p style="font-size: ${baseSize}px; opacity: 0.8;">${config.instructions_text || defaultConfig.instructions_text}</p>
+              </div>
+              
+              <div class="flex justify-between items-center mb-4">
+                <div style="font-size: ${baseSize * 1.25}px; font-weight: 600;">
+                  題目 ${gameState.currentIndex + 1} / ${gameState.questions.length}
+                </div>
+                <div id="score" style="font-size: ${baseSize * 1.5}px; font-weight: 700; color: ${successColor};">
+                  得分: ${gameState.score}
+                </div>
+              </div>
+              
+              <div class="w-full rounded-full mb-6" style="background: ${cardColor}; height: 12px;">
+                <div class="progress-bar-fill h-full rounded-full" style="width: ${progress}%; background: ${accentColor};"></div>
+              </div>
+              
+              <div class="flex-1 flex items-center justify-center mb-6">
+                <div id="flip-card" class="flip-card" style="width: 100%; max-width: 600px; height: 400px;" onclick="flipCard()">
+                  <div class="flip-card-inner">
+                    <div class="flip-card-front" style="background: ${cardColor};">
+                      <img src="${current.url}" alt="紙幣圖片" class="currency-img" loading="lazy" onerror="this.src=''; this.alt='圖片載入失敗'; this.style.display='none';">
+                    </div>
+                    <div class="flip-card-back" style="background: ${cardColor};">
+                      <div class="text-center">
+                        <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; margin-bottom: 24px;">${current.country}</div>
+                        ${!gameState.answered ? `
+                          <div style="font-size: ${baseSize * 1.125}px; margin-bottom: 24px;">答對了嗎?</div>
+                          <div class="flex gap-4 justify-center">
+                            <button onclick="handleAnswer(true)" class="px-8 py-3 rounded-lg font-semibold transition-all hover:opacity-80" style="background: ${successColor}; color: white; font-size: ${baseSize}px;">
+                              ✓ 答對了
+                            </button>
+                            <button onclick="handleAnswer(false)" class="px-8 py-3 rounded-lg font-semibold transition-all hover:opacity-80" style="background: #ef4444; color: white; font-size: ${baseSize}px;">
+                              ✗ 答錯了
+                            </button>
+                          </div>
+                        ` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div class="flex gap-4 justify-center">
+                ${!gameState.isFlipped ? `
+                  <button onclick="flipCard()" class="px-8 py-4 rounded-lg font-semibold transition-all hover:opacity-80" style="background: ${accentColor}; color: white; font-size: ${baseSize * 1.125}px;">
+                    ${config.flip_button_text || defaultConfig.flip_button_text}
+                  </button>
+                ` : gameState.answered ? `
+                  <button onclick="nextQuestion()" class="px-8 py-4 rounded-lg font-semibold transition-all hover:opacity-80" style="background: ${accentColor}; color: white; font-size: ${baseSize * 1.125}px;">
+                    ${config.next_button_text || defaultConfig.next_button_text} →
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        const finalScore = gameState.score;
+        const maxScore = gameState.questions.length * 20;
+        const percentage = (finalScore / maxScore) * 100;
+        
+        app.innerHTML = `
+          <div class="w-full h-full flex items-center justify-center" style="background: ${backgroundColor}; font-family: ${fontFamily}; color: ${textColor};">
+            <div class="text-center p-8 rounded-2xl max-w-lg" style="background: ${cardColor};">
+              <div style="font-size: ${baseSize * 3}px; margin-bottom: 24px;">🎉</div>
+              <h2 class="mb-4" style="font-size: ${baseSize * 2}px; font-weight: 700;">遊戲完成!</h2>
+              <div class="mb-6">
+                <div style="font-size: ${baseSize * 2.5}px; font-weight: 700; color: ${successColor}; margin-bottom: 12px;">
+                  ${finalScore} / ${maxScore}
+                </div>
+                <div style="font-size: ${baseSize * 1.125}px; opacity: 0.8;">
+                  正確率: ${percentage.toFixed(0)}%
+                </div>
+              </div>
+              <button onclick="initGame()" class="px-10 py-4 rounded-lg font-semibold transition-all hover:opacity-80" style="background: ${accentColor}; color: white; font-size: ${baseSize * 1.125}px;">
+                ${config.restart_button_text || defaultConfig.restart_button_text}
+              </button>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    async function onConfigChange(config) {
+      render();
+    }
+
+    if (window.elementSdk) {
+      window.elementSdk.init({
+        defaultConfig,
+        onConfigChange,
+        mapToCapabilities: (config) => ({
+          recolorables: [
+            {
+              get: () => config.background_color || defaultConfig.background_color,
+              set: (value) => {
+                config.background_color = value;
+                window.elementSdk.setConfig({ background_color: value });
+              }
+            },
+            {
+              get: () => config.card_color || defaultConfig.card_color,
+              set: (value) => {
+                config.card_color = value;
+                window.elementSdk.setConfig({ card_color: value });
+              }
+            },
+            {
+              get: () => config.accent_color || defaultConfig.accent_color,
+              set: (value) => {
+                config.accent_color = value;
+                window.elementSdk.setConfig({ accent_color: value });
+              }
+            },
+            {
+              get: () => config.text_color || defaultConfig.text_color,
+              set: (value) => {
+                config.text_color = value;
+                window.elementSdk.setConfig({ text_color: value });
+              }
+            },
+            {
+              get: () => config.success_color || defaultConfig.success_color,
+              set: (value) => {
+                config.success_color = value;
+                window.elementSdk.setConfig({ success_color: value });
+              }
+            }
+          ],
+          borderables: [],
+          fontEditable: {
+            get: () => config.font_family || defaultConfig.font_family,
+            set: (value) => {
+              config.font_family = value;
+              window.elementSdk.setConfig({ font_family: value });
+            }
+          },
+          fontSizeable: {
+            get: () => config.font_size || defaultConfig.font_size,
+            set: (value) => {
+              config.font_size = value;
+              window.elementSdk.setConfig({ font_size: value });
+            }
+          }
+        }),
+        mapToEditPanelValues: (config) => new Map([
+          ["game_title", config.game_title || defaultConfig.game_title],
+          ["instructions_text", config.instructions_text || defaultConfig.instructions_text],
+          ["flip_button_text", config.flip_button_text || defaultConfig.flip_button_text],
+          ["next_button_text", config.next_button_text || defaultConfig.next_button_text],
+          ["restart_button_text", config.restart_button_text || defaultConfig.restart_button_text]
+        ])
+      });
+    }
+
+    initGame();
+  </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9bea35e5332e4a88',t:'MTc2ODUzMDgzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
